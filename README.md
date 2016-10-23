@@ -42,7 +42,7 @@ function(context, next){
             context.log(item.timestamp);
     });
 
-    context.db..put("/demo/item", null);
+    context.db.put("/demo/item", null);
 
     context.db.subscribe("/demo")
     .on("value", function(value){
