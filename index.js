@@ -19,39 +19,41 @@ const firebase = require('firebase');
 
 const EventEmitter = require('events');
 
-function FirebaseMiddleware(app) { 
+firebase.initializeApp({
+  serviceAccount: {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+  },
+  databaseURL: process.env.FIREBASE_DATABASE_URL
+});
+
+var root = process.env.FIREBASE_ROOT || "/";
+var dbref = firebase.database().ref(root);
+
+function FirebaseMiddleware(app) {
 
   if (app.properties["server.Capabilities"]["urn:io.iopa.database"])
-     throw new Error("Database already registered for this app");
+    throw new Error("Database already registered for this app");
 
-   this.app = app;
+  this.app = app;
 
-   firebase.initializeApp({
-     serviceAccount: {
-       projectId: process.env.FIREBASE_PROJECT_ID,
-       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-     },
-     databaseURL: process.env.FIREBASE_DATABASE_URL
-   });
 
-   var root = process.env.FIREBASE_ROOT || "/";
-   var dbref = firebase.database().ref(root);
-   this.dbref = dbref;
+  this.dbref = dbref;
 
-   app.properties["server.Capabilities"]["urn:io.iopa.database"] = {
-       get: function (path) {
-         return new Promise(function (resolve, reject) {
-           var itemRef = dbref.child(path);
+  app.properties["server.Capabilities"]["urn:io.iopa.database"] = {
+    get: function (path) {
+      return new Promise(function (resolve, reject) {
+        var itemRef = dbref.child(path);
 
-           itemRef.once("value", function (snapshot) {
+        itemRef.once("value", function (snapshot) {
 
-             var item = snapshot.val();
-             resolve(item);
-             itemRef = null;
-           }, function (errorObject) {
-             reject(errorObject.code);
-           });
+          var item = snapshot.val();
+          resolve(item);
+          itemRef = null;
+        }, function (errorObject) {
+          reject(errorObject.code);
+        });
          });
      },
        push: function (path, blob) {
