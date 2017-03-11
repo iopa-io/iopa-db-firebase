@@ -43,13 +43,13 @@ function FirebaseMiddleware(app) {
         messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID
       });
 
-      firebase.auth().onAuthStateChanged(user => {
+      firebase.auth().onAuthStateChanged(function(user) {
         console.log("onAuthStateChanged", user);
         if (user === null) {
-          firebase.auth().signInAnonymously().then((result) => {
+          firebase.auth().signInAnonymously().then(function(result) {
             console.log("signInAnonymously", result);
 
-          }).catch(error => {
+          }).catch(function(error) {
             console.log("signInAnonymously", "error", error);
           });
         }
