@@ -1,6 +1,6 @@
 /*
  * Iopa Database Firebase Middleware
- * Copyright (c) 2016 Internet of Protocols Alliance 
+ * Copyright (c) 2017 Internet of Protocols Alliance 
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,110 +15,155 @@
  * limitations under the License.
  */
 
-const firebase = require('firebase');
+const firebase = require("firebase/app");
+require("firebase/auth");
+require("firebase/database");
 
-const EventEmitter = require('events');
-
-firebase.initializeApp({
-  serviceAccount: {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-  },
-  databaseURL: process.env.FIREBASE_DATABASE_URL
-});
-
-var root = process.env.FIREBASE_ROOT || "/";
-var dbref = firebase.database().ref(root);
+var EventEmitter;
 
 function FirebaseMiddleware(app) {
 
-  if (app.properties["server.Capabilities"]["urn:io.iopa.database"])
-    throw new Error("Database already registered for this app");
+  if (process.env.BROWSER) {
+    EventEmitter = function () { throw Error("Not implemented in browser") };
+  } else {
+    EventEmitter = require('events');
+  }
 
   this.app = app;
 
+  if (process.env.BROWSER) {
+    firebase.initializeApp({
+      apiKey: process.env.FIREBASE_API_KEY,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+      databaseURL: process.env.FIREBASE_DATABASE_URL,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID
+    });
+
+    firebase.auth().onAuthStateChanged(user => {
+      console.log("onAuthStateChanged", user);
+      if (user === null) {
+        firebase.auth().signInAnonymously().then((result) => {
+          console.log("signInAnonymously", result);
+
+        }).catch(error => {
+          console.log("signInAnonymously", "error", error);
+        });
+      }
+    });
+  } else {
+    firebase.initializeApp({
+      serviceAccount: {
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      },
+      databaseURL: process.env.FIREBASE_DATABASE_URL
+    });
+  }
+
+  var root = process.env.FIREBASE_ROOT || "/";
+  var dbref = firebase.database().ref(root);
 
   this.dbref = dbref;
 
   app.properties["server.Capabilities"]["urn:io.iopa.database"] = {
+
     get: function (path) {
       return new Promise(function (resolve, reject) {
         var itemRef = dbref.child(path);
 
         itemRef.once("value", function (snapshot) {
-
           var item = snapshot.val();
           resolve(item);
           itemRef = null;
         }, function (errorObject) {
           reject(errorObject.code);
         });
-         });
-     },
-       push: function (path, blob) {
-         var itemRef = dbref.child(path).push();
-         blob.timestamp = firebase.database.ServerValue.TIMESTAMP;
-         itemRef.set(blob);
-         itemRef = null;
-       },
-       put: function (path, blob) {
-         var itemRef = dbref.child(path);
-         if (blob)
-           blob.timestamp = firebase.database.ServerValue.TIMESTAMP;
-         itemRef.set(blob);
-       },
-       subscribe: function (path) {
+      });
+    },
+    push: function (path, blob) {
+      var itemRef = dbref.child(path).push();
+      blob.timestamp = firebase.database.ServerValue.TIMESTAMP;
+      itemRef.set(blob);
+      itemRef = null;
+    },
+    put: function (path, blob) {
+      var itemRef = dbref.child(path);
+      if (blob)
+        blob.timestamp = firebase.database.ServerValue.TIMESTAMP;
+      itemRef.set(blob);
+    },
+    subscribe: function (path, callback) {
 
-         var result = new EventEmitter();
+      var result;
 
-         var itemRef = dbref.child(path);
+      if (!callback) {
+        result = new EventEmitter();
+        callback = (result.emit.bind(this, "value"));
+      }
 
-          itemRef.on("value", function (snapshot) {
-             var item = snapshot.val();
-             if (!item.key)
-                item.key = snapshot.key();
-             result.emit("value", item);
-           }, function (errorObject) {
-            // ignore
-           });
-       },
-       subscribechanges: function (path) {
+      var itemRef = dbref.child(path);
 
-         var result = new EventEmitter();
+      itemRef.on("value", function (snapshot) {
+        var item = snapshot.val();
+        if (!item.key)
+          item.key = snapshot.key();
+        callback(item);
+      }, function (errorObject) {
+        // ignore
+      });
 
-         var itemRef = dbref.child(path);
+      return result;
+    },
+    subscribechanges: function (path, store) {
 
-         itemRef.orderByChild('timestamp').startAt(Date.now()).on('child_added', function (snapshot) {
-           if (!item.key)
-             item.key = snapshot.key();
-           var item = snapshot.val();
-           result.emit("value", item);
-         });
+      var dbadd, dbremove, dbupdate, result;
 
-         itemRef.on('child_removed', function (snapshot) {
-           var item = snapshot.val();
-           if (!item.key)
-             item.key = snapshot.key();
-           result.emit("removed", item);
-         });
+      if (store) {
+        dbadd = store.dbadd.bind(this);
+        dbremove = store.dbremove.bind(this);
+        dbupdate = store.dbupdate.bind(this);
+      } else {
+        result = new EventEmitter();
+        dbadd = result.emit.bind(this, "value");
+        dbremove = result.emit.bind(this, "removed");
+        dbupdate = result.emit.bind(this, "updated");
+      }
 
-         itemRef.on('child_updated', function (snapshot) {
-           var item = snapshot.val();
-           if (!item.key)
-             item.key = snapshot.key();
-           result.emit("updated", item);
-         });
-       }
+      var itemRef = dbref.child(path);
 
-   }
-   app.properties["server.Capabilities"]["urn:io.iopa.database"]["iopa.Version"] = "1.4";
+      itemRef.orderByChild('timestamp').startAt(Date.now()).on('child_added', function (snapshot) {
+        if (!item.key)
+          item.key = snapshot.key();
+        var item = snapshot.val();
+        store.dbadd(item);
+      });
+
+      itemRef.on('child_removed', function (snapshot) {
+        var item = snapshot.val();
+        if (!item.key)
+          item.key = snapshot.key();
+        store.dbremove(item);
+      });
+
+      itemRef.on('child_updated', function (snapshot) {
+        var item = snapshot.val();
+        if (!item.key)
+          item.key = snapshot.key();
+        store.dbupdate(item);
+      });
+
+      return result;
+    }
+  }
+  app.properties["server.Capabilities"]["urn:io.iopa.database"]["iopa.Version"] = "1.4";
 
 }
 
-FirebaseMiddleware.prototype.invoke = function(context, next) {
-   context.db = context.db || this.app.properties["server.Capabilities"]["urn:io.iopa.database"];
-   return next();
+FirebaseMiddleware.prototype.invoke = function (context, next) {
+  context.db = context.db || this.app.properties["server.Capabilities"]["urn:io.iopa.database"];
+  return next();
 }
 
 module.exports = FirebaseMiddleware;
