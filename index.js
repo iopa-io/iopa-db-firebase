@@ -20,7 +20,7 @@ require("firebase/auth");
 require("firebase/database");
 
 var EventEmitter;
-var FIREBASE_INITALIZED = false
+var FIREBASE_INITIALIZED = false
 
 function FirebaseMiddleware(app) {
 
@@ -32,7 +32,7 @@ function FirebaseMiddleware(app) {
 
   this.app = app;
 
-  if (!FIREBASE_INITALIZED) {
+  if (!FIREBASE_INITIALIZED) {
 
     if (process.env.BROWSER) {
       firebase.initializeApp({
@@ -65,7 +65,7 @@ function FirebaseMiddleware(app) {
       });
     }
 
-    FIREBASE_INITALIZED = true;
+    FIREBASE_INITIALIZED = true;
 
   }
 
