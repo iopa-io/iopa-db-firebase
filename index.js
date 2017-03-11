@@ -20,6 +20,7 @@ require("firebase/auth");
 require("firebase/database");
 
 var EventEmitter;
+var FIREBASE_INITALIZED = false
 
 function FirebaseMiddleware(app) {
 
@@ -31,35 +32,41 @@ function FirebaseMiddleware(app) {
 
   this.app = app;
 
-  if (process.env.BROWSER) {
-    firebase.initializeApp({
-      apiKey: process.env.FIREBASE_API_KEY,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-      databaseURL: process.env.FIREBASE_DATABASE_URL,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID
-    });
+  if (!FIREBASE_INITALIZED) {
 
-    firebase.auth().onAuthStateChanged(user => {
-      console.log("onAuthStateChanged", user);
-      if (user === null) {
-        firebase.auth().signInAnonymously().then((result) => {
-          console.log("signInAnonymously", result);
+    if (process.env.BROWSER) {
+      firebase.initializeApp({
+        apiKey: process.env.FIREBASE_API_KEY,
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+        databaseURL: process.env.FIREBASE_DATABASE_URL,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID
+      });
 
-        }).catch(error => {
-          console.log("signInAnonymously", "error", error);
-        });
-      }
-    });
-  } else {
-    firebase.initializeApp({
-      serviceAccount: {
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-      },
-      databaseURL: process.env.FIREBASE_DATABASE_URL
-    });
+      firebase.auth().onAuthStateChanged(user => {
+        console.log("onAuthStateChanged", user);
+        if (user === null) {
+          firebase.auth().signInAnonymously().then((result) => {
+            console.log("signInAnonymously", result);
+
+          }).catch(error => {
+            console.log("signInAnonymously", "error", error);
+          });
+        }
+      });
+    } else {
+      firebase.initializeApp({
+        serviceAccount: {
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+        },
+        databaseURL: process.env.FIREBASE_DATABASE_URL
+      });
+    }
+
+    FIREBASE_INITALIZED = true;
+
   }
 
   var root = process.env.FIREBASE_ROOT || "/";
