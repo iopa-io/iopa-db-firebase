@@ -43,13 +43,13 @@ function FirebaseMiddleware(app) {
         messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID
       });
 
-      firebase.auth().onAuthStateChanged(function(user) {
+      firebase.auth().onAuthStateChanged(function (user) {
         console.log("onAuthStateChanged", user);
         if (user === null) {
-          firebase.auth().signInAnonymously().then(function(result) {
+          firebase.auth().signInAnonymously().then(function (result) {
             console.log("signInAnonymously", result);
 
-          }).catch(function(error) {
+          }).catch(function (error) {
             console.log("signInAnonymously", "error", error);
           });
         }
@@ -92,14 +92,13 @@ function FirebaseMiddleware(app) {
     push: function (path, blob) {
       var itemRef = dbref.child(path).push();
       blob.timestamp = firebase.database.ServerValue.TIMESTAMP;
-      itemRef.set(blob);
-      itemRef = null;
+      return itemRef.set(blob);
     },
     put: function (path, blob) {
       var itemRef = dbref.child(path);
       if (blob)
         blob.timestamp = firebase.database.ServerValue.TIMESTAMP;
-      itemRef.set(blob);
+      return itemRef.set(blob);
     },
     subscribe: function (path, callback) {
 
