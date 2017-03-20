@@ -28,6 +28,7 @@ process.env.FIREBASE_ROOT = "/";
 
 // Use the DBMiddleWare adds a .db object to every context record for remainder of chain
 app.use(require(DBMiddleware));
+app.use(require(DBMiddleware.filestorage));  // optional
 ```
 
 ``` js
