@@ -16,6 +16,5 @@
  */
 
 const FirebaseMiddleware = require('./src/db');
-Object.defineProperty(FirebaseMiddleware, "filestorage", { get: require('./src/filestorage') });
-
 module.exports = FirebaseMiddleware;
+module.exports.filestorage = require('./src/filestorage');
