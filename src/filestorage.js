@@ -39,7 +39,6 @@ function FirebaseStorageMiddleware(app) {
             return storageRef.child(path)
                 .getDownloadURL()
                 .then(function (url) {
-                    console.log("From Cache" + id);
                     return Promise.resolve(url.toString())
                 }, function (err) {
                     return Promise.resolve(null);
